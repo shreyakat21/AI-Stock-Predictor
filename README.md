@@ -1,51 +1,87 @@
-# Stock Predictor using LSTM
+# AI Stock Predictor
 
-This project uses historical stock price data and a Long Short-Term Memory (LSTM) model to predict future stock prices. The model is trained on past stock data and can predict the next day's closing price based on the historical trends.
+An interactive app that trains an LSTM neural network on any stock ticker to
+backtest and forecast closing prices, paired with an AI agent (Groq +
+Phidata) that answers natural-language questions about a stock's
+fundamentals and analyst recommendations.
 
-## Requirements
+## Features
 
-To run this project, you'll need the following Python libraries:
+- **Any ticker, live** — type any symbol yfinance supports (`AAPL`, `TSLA`,
+  `NVDA`, ...) and the app fetches fresh historical data on demand.
+- **Tunable model** — adjust the history window, LSTM lookback, training
+  epochs, and forecast horizon from the sidebar.
+- **Future forecasting** — recursively predicts N business days beyond the
+  latest known price, not just a backtest on historical data.
+- **Interactive charts** — actual vs. predicted vs. forecast, with RMSE/MAE
+  metrics, rendered with Plotly.
+- **AI market insights** — ask a Groq-powered agent to summarize
+  fundamentals and analyst recommendations for any company or ticker.
 
-- `yfinance` - For downloading stock data.
-- `numpy` - For numerical operations.
-- `pandas` - For handling data.
-- `sklearn` - For scaling the data.
-- `tensorflow` - For building and training the LSTM model.
-- `matplotlib` - For visualizing the predictions.
+## Setup
 
-You can install all dependencies by running:
+1. Install dependencies:
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. Add your [Groq API key](https://console.groq.com/keys) (only needed for
+   the AI Insights tab):
+
+   ```bash
+   cp .env.example .env
+   # then edit .env and set GROQ_API_KEY
+   ```
+
+## Run the app
 
 ```bash
-pip install -r requirements.txt
+streamlit run app.py
 ```
 
-## How to Use
-Download Historical Stock Data: The stock data is fetched using the yfinance library. You can change the stock symbol (e.g., AAPL for Apple) in the code.
+This opens the interactive dashboard in your browser:
 
-Prepare Data: The data is normalized using MinMaxScaler and then transformed into sequences of past stock prices to predict the next day's closing price.
+- **Prediction tab** — pick a ticker and model settings in the sidebar,
+  click **Run Prediction**, and get a backtested chart plus an optional
+  future-price forecast.
+- **AI Insights tab** — ask questions like "compare TSLA and MSFT
+  fundamentals" and get a markdown-formatted, table-rich answer.
 
-Train the Model: The model is built using an LSTM architecture with two LSTM layers and dropout for regularization. The model is trained using the training data.
+## Using the pieces standalone
 
-Prediction and Visualization: After training, the model predicts stock prices on the test dataset, and the predictions are visualized alongside the actual stock prices.
-
-## Customizing for Different Stocks
-To predict stock prices for a different company, just modify the symbol variable in the Main Script section to the stock ticker you want to analyze (e.g., "TSLA" for Tesla).
+Both the model and the agent are importable, and each still runs as a
+script for a quick CLI demo:
 
 ```bash
-symbol = "TSLA"  # Example: Tesla stock
+python stock_predictor.py      # trains on AAPL, plots actual/predicted/forecast with matplotlib
+python finance_agent.py        # compares TSLA and MSFT fundamentals in the terminal
+python finance_agent.py "What is Nvidia's forward P/E?"
 ```
-## Model Hyperparameters
-You can adjust the following parameters for different results:
 
-lookback: The number of past days the model will use to predict the next day's stock price.
-LSTM model architecture: You can modify the number of LSTM layers, the number of units in each layer, and the dropout rate to improve model accuracy.
-python
-Copy code
-lookback = 60  # Number of past days to use for prediction
-## Example Output
-The model generates a plot that compares the predicted stock prices with the actual stock prices:
+```python
+from stock_predictor import run_prediction
 
-Actual prices: Shown as the real historical closing prices.
-Predicted prices: Shown as the model's predictions for the stock prices.
-## Training and Evaluation
-The model is trained with 80% of the historical data, and the remaining 20% is used for testing. Early stopping is used to prevent overfitting by halting training if the validation loss doesn't improve for a specified number of epochs.
+result = run_prediction("TSLA", start_date="2018-01-01", lookback=60, epochs=25, forecast_days=10)
+print(result.rmse, result.mae)
+```
+
+## How the model works
+
+1. **Fetch** — historical daily closing prices via `yfinance`.
+2. **Prepare** — scale prices with `MinMaxScaler` and slice into
+   overlapping `lookback`-day windows.
+3. **Train** — a 2-layer LSTM (with dropout) on 80% of the windows, early
+   stopping on validation loss.
+4. **Backtest** — predict the held-out 20% and report RMSE/MAE against
+   actual prices.
+5. **Forecast** — recursively feed each new prediction back in as input to
+   project `forecast_days` beyond the last known price.
+
+## Notes
+
+- Model training happens on every new ticker/settings combination and is
+  cached per session (`st.cache_data`) to avoid retraining on every
+  interaction.
+- Stock price forecasts are for educational purposes only and are not
+  financial advice.
